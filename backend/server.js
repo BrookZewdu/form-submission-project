@@ -7,7 +7,6 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-const sharp = require('sharp');
 require('dotenv').config();
 
 const app = express();
@@ -177,7 +176,7 @@ app.get('/api/users', (req, res) => {
   db.all(`
     SELECT 
       id, 
-      (first_name || ' ' || last_name) as full_name, 
+      name,
       image_url,
       created_at
     FROM users 
@@ -207,9 +206,7 @@ app.get('/api/users/:id', (req, res) => {
   db.get(`
     SELECT 
       id, 
-      first_name,
-      last_name,
-      (first_name || ' ' || last_name) as full_name,
+      name,
       image_url,
       image_path,
       created_at
@@ -239,13 +236,13 @@ app.get('/api/users/:id', (req, res) => {
 // Submit form with image upload
 app.post('/api/submit', upload.single('image'), async (req, res) => {
   try {
-    const { first_name, last_name } = req.body;
+    const { name } = req.body;
     
     // Validation
-    if (!first_name || !last_name) {
+    if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
-        error: 'First name and last name are required'
+        error: 'Name is required'
       });
     }
 
@@ -290,11 +287,11 @@ app.post('/api/submit', upload.single('image'), async (req, res) => {
 
     // Insert into database
     const stmt = db.prepare(`
-      INSERT INTO users (id, first_name, last_name, image_path, image_url)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users (id, name, image_path, image_url)
+      VALUES (?, ?, ?, ?)
     `);
 
-    stmt.run([userId, first_name, last_name, imagePath, imageUrl], function(err) {
+    stmt.run([userId, name.trim(), imagePath, imageUrl], function(err) {
       if (err) {
         console.error('Error inserting user:', err.message);
         
@@ -314,15 +311,13 @@ app.post('/api/submit', upload.single('image'), async (req, res) => {
       } else {
         const userData = {
           id: userId,
-          first_name,
-          last_name,
-          full_name: `${first_name} ${last_name}`,
+          name: name.trim(),
           image_url: imageUrl,
           created_at: new Date().toISOString(),
           storage_type: USE_SPACES ? 'spaces' : 'local'
         };
 
-        console.log(`✅ New submission: ${userData.full_name}`);
+        console.log(`✅ New submission: ${userData.name}`);
 
         res.status(201).json({
           success: true,

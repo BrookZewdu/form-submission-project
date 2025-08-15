@@ -45,13 +45,7 @@
     color: #ef4444;
   }
   
-  /* Name Fields */
-  .name-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-  }
-  
+  /* Input Group */
   .input-group {
     position: relative;
   }
@@ -279,11 +273,6 @@
     
     .submission-form {
       padding: 1.5rem;
-    }
-    
-    .name-fields {
-      grid-template-columns: 1fr;
-      gap: 1rem;
     }
     
     .dropzone {

@@ -5,8 +5,7 @@ import './SubmissionForm.css';
 
 const SubmissionForm = () => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: ''
+    name: ''
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -83,13 +82,8 @@ const SubmissionForm = () => {
     e.preventDefault();
     
     // Validation
-    if (!formData.firstName.trim()) {
-      setMessage({ type: 'error', text: 'First name is required' });
-      return;
-    }
-    
-    if (!formData.lastName.trim()) {
-      setMessage({ type: 'error', text: 'Last name is required' });
+    if (!formData.name.trim()) {
+      setMessage({ type: 'error', text: 'Name is required' });
       return;
     }
     
@@ -104,8 +98,7 @@ const SubmissionForm = () => {
     try {
       // Create FormData
       const submitData = new FormData();
-      submitData.append('first_name', formData.firstName.trim());
-      submitData.append('last_name', formData.lastName.trim());
+      submitData.append('name', formData.name.trim());
       submitData.append('image', selectedFile);
 
       // Submit to backend
@@ -122,7 +115,7 @@ const SubmissionForm = () => {
         });
         
         // Reset form
-        setFormData({ firstName: '', lastName: '' });
+        setFormData({ name: '' });
         setSelectedFile(null);
         setPreviewUrl(null);
         
@@ -174,35 +167,22 @@ const SubmissionForm = () => {
       <form onSubmit={handleSubmit} className="submission-form">
         <h2 className="form-title">Form</h2>
         
-        {/* Name Fields */}
+        {/* Name Field */}
         <div className="form-section">
-          <label className="form-label">Name</label>
-          <div className="name-fields">
-            <div className="input-group">
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                className="form-input"
-                placeholder=""
-                required
-              />
-              <label className="input-label">First Name</label>
-            </div>
-            
-            <div className="input-group">
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                className="form-input"
-                placeholder=""
-                required
-              />
-              <label className="input-label">Last Name</label>
-            </div>
+          <label className="form-label">
+            Name <span className="required">*</span>
+          </label>
+          <div className="input-group">
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              className="form-input"
+              placeholder=""
+              required
+            />
+            <label className="input-label">Enter image name</label>
           </div>
         </div>
 

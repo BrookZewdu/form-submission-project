@@ -7,7 +7,7 @@ function App() {
     <div className="App">
       <header className="App-header">
         <h1>📝 Form Submission</h1>
-        <p>Submit your information with an image</p>
+        <p>Submit your image and its name</p>
       </header>
       
       <main className="App-main">

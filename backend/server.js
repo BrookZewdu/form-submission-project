@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-
+const sharp = require('sharp');
 require('dotenv').config();
 
 const app = express();

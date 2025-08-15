@@ -233,6 +233,87 @@ app.get('/api/users/:id', (req, res) => {
   });
 });
 
+
+// Update user name by ID
+app.put('/api/users/:id', (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  
+  // Validation
+  if (!name || !name.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Name is required'
+    });
+  }
+
+  // First check if user exists
+  db.get('SELECT id FROM users WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      console.error('Error checking user existence:', err.message);
+      return res.status(500).json({ 
+        success: false,
+        error: 'Internal server error' 
+      });
+    }
+    
+    if (!row) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'User not found' 
+      });
+    }
+
+    // Update the user's name
+    const stmt = db.prepare('UPDATE users SET name = ? WHERE id = ?');
+    
+    stmt.run([name.trim(), id], function(err) {
+      if (err) {
+        console.error('Error updating user name:', err.message);
+        res.status(500).json({ 
+          success: false,
+          error: 'Internal server error' 
+        });
+      } else if (this.changes === 0) {
+        res.status(404).json({ 
+          success: false,
+          error: 'User not found' 
+        });
+      } else {
+        // Fetch and return the updated user data
+        db.get(`
+          SELECT 
+            id, 
+            name,
+            image_url,
+            image_path,
+            created_at
+          FROM users 
+          WHERE id = ?
+        `, [id], (err, updatedRow) => {
+          if (err) {
+            console.error('Error fetching updated user:', err.message);
+            res.status(500).json({ 
+              success: false,
+              error: 'Update successful but could not fetch updated data' 
+            });
+          } else {
+            console.log(`✅ Updated user name: ${updatedRow.name} (ID: ${id})`);
+            
+            res.json({
+              success: true,
+              message: 'Name updated successfully',
+              data: updatedRow
+            });
+          }
+        });
+      }
+    });
+
+    stmt.finalize();
+  });
+});
+
 // Submit form with image upload
 app.post('/api/submit', upload.single('image'), async (req, res) => {
   try {

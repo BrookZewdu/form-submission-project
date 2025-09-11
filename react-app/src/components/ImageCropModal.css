@@ -1,0 +1,138 @@
+.crop-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.crop-modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.crop-modal-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.crop-modal-header h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  color: #1f2937;
+}
+
+.crop-modal-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.crop-container {
+  position: relative;
+  height: 400px;
+  background: #f3f4f6;
+}
+
+.crop-controls {
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.zoom-control label {
+  font-weight: 500;
+  color: #374151;
+  min-width: 50px;
+}
+
+.zoom-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+}
+
+.zoom-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+}
+
+.crop-actions {
+  padding: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  border-top: 1px solid #e5e7eb;
+}
+
+.crop-cancel-btn,
+.crop-confirm-btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 0.875rem;
+}
+
+.crop-cancel-btn {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.crop-cancel-btn:hover {
+  background: #e5e7eb;
+}
+
+.crop-confirm-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.crop-confirm-btn:hover {
+  background: #2563eb;
+}
+
+@media (max-width: 640px) {
+  .crop-modal {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .crop-container {
+    height: 300px;
+  }
+}

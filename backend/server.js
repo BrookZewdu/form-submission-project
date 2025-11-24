@@ -452,6 +452,55 @@ app.post("/api/submit", upload.single("image"), async (req, res) => {
   }
 });
 
+// Delete all users (clear gallery) - also removes images from Spaces
+app.delete("/api/users", async (req, res) => {
+  try {
+    // First, get all users to find their image paths
+    const users = await new Promise((resolve, reject) => {
+      db.all("SELECT id, image_path FROM users", (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+
+    // Delete images from Spaces if enabled
+    if (USE_SPACES && spacesEndpoint && users.length > 0) {
+      for (const user of users) {
+        if (user.image_path) {
+          try {
+            await spacesEndpoint
+              .deleteObject({
+                Bucket: process.env.SPACES_BUCKET,
+                Key: user.image_path,
+              })
+              .promise();
+            console.log(`🗑️ Deleted from Spaces: ${user.image_path}`);
+          } catch (e) {
+            console.error(
+              `Failed to delete ${user.image_path} from Spaces:`,
+              e.message
+            );
+          }
+        }
+      }
+    }
+
+    // Clear the database
+    await new Promise((resolve, reject) => {
+      db.run("DELETE FROM users", function (err) {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log(`✅ Cleared ${users.length} users and their images`);
+    res.json({ success: true, message: `Cleared ${users.length} images` });
+  } catch (error) {
+    console.error("Error clearing users:", error);
+    res.status(500).json({ success: false, error: "Failed to clear gallery" });
+  }
+});
+
 // Serve React app for all non-API routes (this must be last!)
 if (process.env.NODE_ENV === "production") {
   app.get("*", (req, res) => {

@@ -772,6 +772,36 @@ app.post("/api/twilio/webhook", (req, res) => {
   }
 });
 
+// Get donations by tags
+app.get("/api/donations", (req, res) => {
+  const { tags } = req.query;
+
+  let query = "SELECT * FROM donations ORDER BY created_at DESC";
+  let params = [];
+
+  if (tags) {
+    query = "SELECT * FROM donations WHERE tags = ? ORDER BY created_at DESC";
+    params = [tags];
+  }
+
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    res.json({
+      success: true,
+      data: rows.map((row) => ({
+        donationId: row.id,
+        amount: row.amount,
+        dedication_message: row.message,
+        display_name: row.phone,
+        date: row.created_at,
+      })),
+      count: rows.length,
+    });
+  });
+});
+
 // Serve React app for all non-API routes (this must be last!)
 if (process.env.NODE_ENV === "production") {
   app.get("*", (req, res) => {

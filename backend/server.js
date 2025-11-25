@@ -743,21 +743,20 @@ app.post("/api/twilio/webhook", (req, res) => {
       const dedication =
         message.trim() === (amountMatch?.[0] || "") ? "" : message;
 
+      const donationId = Date.now().toString();
       db.run(
-        "INSERT INTO users (data, tags, created_at) VALUES (?, ?, ?)",
+        "INSERT INTO donations (id, phone, amount, message, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         [
-          JSON.stringify({
-            amount,
-            message: dedication,
-            phone: phoneNumber,
-            "first name": "",
-            "last name": "",
-          }),
+          donationId,
+          phoneNumber,
+          amount,
+          dedication,
           "twilio",
           new Date().toISOString(),
         ],
         (err) => {
-          if (!err) console.log(`💰 Donation: ${phoneNumber} → $${amount}`);
+          if (err) console.error("Donation error:", err);
+          else console.log(`💰 Donation: ${phoneNumber} → $${amount}`);
         }
       );
 

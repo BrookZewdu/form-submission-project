@@ -113,6 +113,23 @@ db.serialize(() => {
     }
   );
 
+  db.run(
+    `
+    CREATE TABLE IF NOT EXISTS donations (
+      id TEXT PRIMARY KEY,
+      phone TEXT,
+      amount INTEGER,
+      message TEXT,
+      tags TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `,
+    (err) => {
+      if (err) console.error("❌ Error creating donations table:", err.message);
+      else console.log("✅ Donations table created");
+    }
+  );
+
   // Add some helpful logging
   db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
     if (err) {

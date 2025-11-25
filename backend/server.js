@@ -794,9 +794,11 @@ app.get("/api/donations", (req, res) => {
         donationId: row.id,
         display_name: row.phone,
         date: row.created_at,
-        dedication_message: row.message || "",
-        attributes: {
-          real_payment: row.amount,
+        formData: {
+          attributes: {
+            real_payment: row.amount,
+            dedication: row.message || "",
+          },
         },
       })),
       count: rows.length,

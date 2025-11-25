@@ -792,10 +792,12 @@ app.get("/api/donations", (req, res) => {
       success: true,
       data: rows.map((row) => ({
         donationId: row.id,
-        amount: row.amount,
-        dedication_message: row.message,
         display_name: row.phone,
         date: row.created_at,
+        dedication_message: row.message || "",
+        attributes: {
+          real_payment: row.amount,
+        },
       })),
       count: rows.length,
     });

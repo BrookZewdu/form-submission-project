@@ -501,6 +501,278 @@ app.delete("/api/users", async (req, res) => {
   }
 });
 
+// ==================== VOTING API ROUTES ====================
+
+// Get votes
+app.get("/api/votes", (req, res) => {
+  db.all("SELECT * FROM votes ORDER BY created_at DESC", (err, votes) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    db.get("SELECT * FROM voting_config WHERE id = 1", (err, config) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      db.all(
+        "SELECT * FROM voting_history ORDER BY ended_at DESC",
+        (err, history) => {
+          res.json({
+            currentRound: config?.current_round || 1,
+            roundStatus: config?.status || "stopped",
+            votes: votes || [],
+            roundHistory: (history || []).map((h) => ({
+              round: h.round,
+              votes: JSON.parse(h.votes_json),
+              endedAt: h.ended_at,
+            })),
+          });
+        }
+      );
+    });
+  });
+});
+
+// Submit vote
+app.post("/api/votes", (req, res) => {
+  const { phoneNumber, letter } = req.body;
+
+  db.get(
+    "SELECT current_round FROM voting_config WHERE id = 1",
+    (err, config) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      const currentRound = config?.current_round || 1;
+
+      db.get(
+        "SELECT * FROM votes WHERE phone_number = ? AND round = ?",
+        [phoneNumber, currentRound],
+        (err, existing) => {
+          if (existing) {
+            return res.status(400).json({
+              success: false,
+              error: "Phone number already voted in this round",
+            });
+          }
+
+          db.run(
+            "INSERT INTO votes (phone_number, letter, round, created_at) VALUES (?, ?, ?, ?)",
+            [
+              phoneNumber,
+              letter.toUpperCase(),
+              currentRound,
+              new Date().toISOString(),
+            ],
+            function (err) {
+              if (err) return res.status(500).json({ error: err.message });
+
+              res.json({
+                success: true,
+                vote: {
+                  id: this.lastID.toString(),
+                  phoneNumber,
+                  letter: letter.toUpperCase(),
+                  round: currentRound,
+                  createdAt: new Date().toISOString(),
+                },
+              });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Delete vote
+app.delete("/api/votes/:voteId", (req, res) => {
+  db.run("DELETE FROM votes WHERE id = ?", [req.params.voteId], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Update voting status
+app.post("/api/votes/status", (req, res) => {
+  const { status } = req.body;
+
+  db.get("SELECT * FROM voting_config WHERE id = 1", (err, config) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    const oldStatus = config?.status || "stopped";
+
+    if (status === "stopped" && oldStatus !== "stopped") {
+      // Archive current round
+      db.all(
+        "SELECT * FROM votes WHERE round = ?",
+        [config.current_round],
+        (err, roundVotes) => {
+          if (!err && roundVotes.length > 0) {
+            db.run(
+              "INSERT INTO voting_history (round, votes_json, ended_at) VALUES (?, ?, ?)",
+              [
+                config.current_round,
+                JSON.stringify(roundVotes),
+                new Date().toISOString(),
+              ]
+            );
+          }
+
+          // Clear votes and increment round
+          db.run("DELETE FROM votes WHERE round = ?", [config.current_round]);
+          db.run(
+            "UPDATE voting_config SET status = ?, current_round = current_round + 1 WHERE id = 1",
+            [status],
+            (err) => {
+              if (err) return res.status(500).json({ error: err.message });
+
+              db.get(
+                "SELECT * FROM voting_config WHERE id = 1",
+                (err, newConfig) => {
+                  res.json({
+                    success: true,
+                    currentRound: newConfig?.current_round || 1,
+                    roundStatus: newConfig?.status || "stopped",
+                  });
+                }
+              );
+            }
+          );
+        }
+      );
+    } else {
+      db.run(
+        "UPDATE voting_config SET status = ? WHERE id = 1",
+        [status],
+        (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({
+            success: true,
+            currentRound: config?.current_round || 1,
+            roundStatus: status,
+          });
+        }
+      );
+    }
+  });
+});
+
+// Clear voting display
+app.post("/api/votes/clear", (req, res) => {
+  db.get("SELECT * FROM voting_config WHERE id = 1", (err, config) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    db.all(
+      "SELECT * FROM votes WHERE round = ?",
+      [config.current_round],
+      (err, votes) => {
+        if (!err && votes.length > 0) {
+          db.run(
+            "INSERT INTO voting_history (round, votes_json, ended_at) VALUES (?, ?, ?)",
+            [
+              config.current_round,
+              JSON.stringify(votes),
+              new Date().toISOString(),
+            ]
+          );
+        }
+
+        db.run(
+          "DELETE FROM votes WHERE round = ?",
+          [config.current_round],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+
+            db.run(
+              "UPDATE voting_config SET status = ? WHERE id = 1",
+              ["stopped"],
+              (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ success: true });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
+// Twilio webhook
+app.post("/api/twilio/webhook", (req, res) => {
+  try {
+    const { From, Body } = req.body;
+    if (!From || !Body) return res.status(400).send("Missing fields");
+
+    const phoneNumber = From;
+    const message = Body.trim();
+    const isSingleLetter = /^[A-Fa-f]$/i.test(message);
+
+    if (isSingleLetter) {
+      // Vote
+      const letter = message.toUpperCase();
+
+      db.get(
+        "SELECT current_round FROM voting_config WHERE id = 1",
+        (err, config) => {
+          const currentRound = config?.current_round || 1;
+
+          db.get(
+            "SELECT * FROM votes WHERE phone_number = ? AND round = ?",
+            [phoneNumber, currentRound],
+            (err, existing) => {
+              if (!existing) {
+                db.run(
+                  "INSERT INTO votes (phone_number, letter, round, created_at) VALUES (?, ?, ?, ?)",
+                  [phoneNumber, letter, currentRound, new Date().toISOString()],
+                  (err) => {
+                    if (!err)
+                      console.log(`✅ Vote: ${phoneNumber} → ${letter}`);
+                  }
+                );
+              } else {
+                console.log(`⚠️ Duplicate vote: ${phoneNumber}`);
+              }
+            }
+          );
+        }
+      );
+
+      res.type("text/xml").send("<Response></Response>");
+    } else {
+      // Donation
+      const amountMatch = message.match(/\d+/);
+      const amount = amountMatch ? parseInt(amountMatch[0]) : 0;
+      const dedication =
+        message.trim() === (amountMatch?.[0] || "") ? "" : message;
+
+      db.run(
+        "INSERT INTO users (data, tags, created_at) VALUES (?, ?, ?)",
+        [
+          JSON.stringify({
+            amount,
+            message: dedication,
+            phone: phoneNumber,
+            "first name": "",
+            "last name": "",
+          }),
+          "twilio",
+          new Date().toISOString(),
+        ],
+        (err) => {
+          if (!err) console.log(`💰 Donation: ${phoneNumber} → $${amount}`);
+        }
+      );
+
+      // Auto-reply (you can make this configurable later)
+      const reply = "Thank you for your pledge!";
+      res
+        .type("text/xml")
+        .send(`<Response><Message>${reply}</Message></Response>`);
+    }
+  } catch (error) {
+    console.error("Webhook error:", error);
+    res.status(500).send("Error");
+  }
+});
+
 // Serve React app for all non-API routes (this must be last!)
 if (process.env.NODE_ENV === "production") {
   app.get("*", (req, res) => {

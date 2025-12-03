@@ -49,6 +49,24 @@ const db = new sqlite3.Database(dbPath, (err) => {
     process.exit(1);
   } else {
     console.log("Connected to SQLite database");
+    // Create app_config table if it doesn't exist
+    db.run(`
+      CREATE TABLE IF NOT EXISTS app_config (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at TEXT
+      )
+    `, (err) => {
+      if (err) {
+        console.error("Error creating app_config table:", err.message);
+      } else {
+        // Insert default auto_reply_message if not exists
+        db.run(`
+          INSERT OR IGNORE INTO app_config (key, value, updated_at)
+          VALUES ('auto_reply_message', 'Thank you for your pledge!', datetime('now'))
+        `);
+      }
+    });
   }
 });
 
@@ -179,6 +197,43 @@ app.get("/api/health", (req, res) => {
     storage: USE_SPACES ? "Digital Ocean Spaces" : "Local Storage",
     spaces_bucket: USE_SPACES ? process.env.SPACES_BUCKET : "N/A",
   });
+});
+
+// Get config value
+app.get("/api/config/:key", (req, res) => {
+  const { key } = req.params;
+  db.get("SELECT value, updated_at FROM app_config WHERE key = ?", [key], (err, row) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ success: false, error: "Config key not found" });
+    }
+    res.json({ success: true, key, value: row.value, updated_at: row.updated_at });
+  });
+});
+
+// Set config value
+app.post("/api/config/:key", (req, res) => {
+  const { key } = req.params;
+  const { value } = req.body;
+
+  if (value === undefined) {
+    return res.status(400).json({ success: false, error: "Value is required" });
+  }
+
+  db.run(
+    `INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`,
+    [key, value],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+      console.log(`✅ Config updated: ${key} = ${value}`);
+      res.json({ success: true, key, value, updated_at: new Date().toISOString() });
+    }
+  );
 });
 
 // Get all users (for gallery)
@@ -760,11 +815,16 @@ app.post("/api/twilio/webhook", (req, res) => {
         }
       );
 
-      // Auto-reply (you can make this configurable later)
-      const reply = "Thank you for your pledge!";
-      res
-        .type("text/xml")
-        .send(`<Response><Message>${reply}</Message></Response>`);
+      // Auto-reply from config
+      db.get(
+        "SELECT value FROM app_config WHERE key = 'auto_reply_message'",
+        (err, row) => {
+          const reply = row?.value || "Thank you for your pledge!";
+          res
+            .type("text/xml")
+            .send(`<Response><Message>${reply}</Message></Response>`);
+        }
+      );
     }
   } catch (error) {
     console.error("Webhook error:", error);

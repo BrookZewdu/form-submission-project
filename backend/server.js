@@ -590,9 +590,17 @@ app.post("/api/votes", (req, res) => {
   const { phoneNumber, letter } = req.body;
 
   db.get(
-    "SELECT current_round FROM voting_config WHERE id = 1",
+    "SELECT current_round, status FROM voting_config WHERE id = 1",
     (err, config) => {
       if (err) return res.status(500).json({ error: err.message });
+
+      // Only accept votes when voting is running
+      if (config?.status !== "running") {
+        return res.status(400).json({
+          success: false,
+          error: "Voting is not currently active",
+        });
+      }
 
       const currentRound = config?.current_round || 1;
 
@@ -765,8 +773,14 @@ app.post("/api/twilio/webhook", (req, res) => {
       const letter = message.toUpperCase();
 
       db.get(
-        "SELECT current_round FROM voting_config WHERE id = 1",
+        "SELECT current_round, status FROM voting_config WHERE id = 1",
         (err, config) => {
+          // Only accept votes when voting is running
+          if (config?.status !== "running") {
+            console.log(`⚠️ Vote rejected (voting not active): ${phoneNumber} → ${letter}`);
+            return;
+          }
+
           const currentRound = config?.current_round || 1;
 
           db.get(

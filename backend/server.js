@@ -807,9 +807,18 @@ app.post("/api/twilio/webhook", (req, res) => {
       db.get(
         "SELECT current_round, status FROM voting_config WHERE id = 1",
         (err, config) => {
-          // Only accept votes when voting is running
+          // If voting is not running, store as pending vote
           if (config?.status !== "running") {
-            console.log(`⚠️ Vote rejected (voting not active): ${phoneNumber} → ${letter}`);
+            db.run(
+              "INSERT INTO pending_votes (phone_number, letter, created_at) VALUES (?, ?, ?)",
+              [phoneNumber, letter, new Date().toISOString()],
+              (err) => {
+                if (!err)
+                  console.log(`📝 Pending vote stored: ${phoneNumber} → ${letter}`);
+                else
+                  console.log(`⚠️ Error storing pending vote: ${err.message}`);
+              }
+            );
             return;
           }
 

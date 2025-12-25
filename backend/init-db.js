@@ -113,6 +113,25 @@ db.serialize(() => {
     }
   );
 
+  // Pending votes table - stores votes that come in while voting is paused
+  db.run(
+    `
+  CREATE TABLE IF NOT EXISTS pending_votes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone_number TEXT NOT NULL,
+    letter TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`,
+    (err) => {
+      if (err) {
+        console.error("❌ Error creating pending_votes table:", err.message);
+      } else {
+        console.log("✅ Pending votes table created successfully");
+      }
+    }
+  );
+
   db.run(
     `
     CREATE TABLE IF NOT EXISTS donations (

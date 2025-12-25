@@ -569,16 +569,23 @@ app.get("/api/votes", (req, res) => {
       db.all(
         "SELECT * FROM voting_history ORDER BY ended_at DESC",
         (err, history) => {
-          res.json({
-            currentRound: config?.current_round || 1,
-            roundStatus: config?.status || "stopped",
-            votes: votes || [],
-            roundHistory: (history || []).map((h) => ({
-              round: h.round,
-              votes: JSON.parse(h.votes_json),
-              endedAt: h.ended_at,
-            })),
-          });
+          // Also fetch pending votes
+          db.all(
+            "SELECT * FROM pending_votes ORDER BY created_at DESC",
+            (err, pendingVotes) => {
+              res.json({
+                currentRound: config?.current_round || 1,
+                roundStatus: config?.status || "stopped",
+                votes: votes || [],
+                pendingVotes: pendingVotes || [],
+                roundHistory: (history || []).map((h) => ({
+                  round: h.round,
+                  votes: JSON.parse(h.votes_json),
+                  endedAt: h.ended_at,
+                })),
+              });
+            }
+          );
         }
       );
     });
@@ -594,12 +601,29 @@ app.post("/api/votes", (req, res) => {
     (err, config) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      // Only accept votes when voting is running
+      // If voting is not running, store as pending vote instead of rejecting
       if (config?.status !== "running") {
-        return res.status(400).json({
-          success: false,
-          error: "Voting is not currently active",
-        });
+        // Store in pending_votes table
+        db.run(
+          "INSERT INTO pending_votes (phone_number, letter, created_at) VALUES (?, ?, ?)",
+          [phoneNumber, letter.toUpperCase(), new Date().toISOString()],
+          function (err) {
+            if (err) return res.status(500).json({ error: err.message });
+
+            console.log(`📝 Pending vote stored: ${phoneNumber} → ${letter.toUpperCase()}`);
+            res.json({
+              success: true,
+              pending: true,
+              vote: {
+                id: this.lastID.toString(),
+                phoneNumber,
+                letter: letter.toUpperCase(),
+                createdAt: new Date().toISOString(),
+              },
+            });
+          }
+        );
+        return;
       }
 
       const currentRound = config?.current_round || 1;
@@ -701,6 +725,14 @@ app.post("/api/votes/status", (req, res) => {
         }
       );
     } else {
+      // If changing to "running", clear pending votes (discard them)
+      if (status === "running") {
+        db.run("DELETE FROM pending_votes", (err) => {
+          if (err) console.error("Error clearing pending votes:", err.message);
+          else console.log("🗑️ Cleared pending votes on voting start");
+        });
+      }
+
       db.run(
         "UPDATE voting_config SET status = ? WHERE id = 1",
         [status],
